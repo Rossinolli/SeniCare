@@ -329,23 +329,38 @@ class SettingsScreen extends StatelessWidget {
                             color: subTextColor,
                           ),
                         ),
-                        _buildAlertModeOption(
-                          label: 'Notificações e Alarmes',
-                          value: 'both',
-                          textColor: textColor,
-                          fontSizeMultiplier: fontSizeMultiplier,
-                        ),
-                        _buildAlertModeOption(
-                          label: 'Apenas Notificações',
-                          value: 'notifications_only',
-                          textColor: textColor,
-                          fontSizeMultiplier: fontSizeMultiplier,
-                        ),
-                        _buildAlertModeOption(
-                          label: 'Apenas Alarmes',
-                          value: 'alarms_only',
-                          textColor: textColor,
-                          fontSizeMultiplier: fontSizeMultiplier,
+                        // RadioGroup (Flutter 3.32+): substitui o
+                        // groupValue/onChanged depreciados de cada
+                        // RadioListTile.
+                        RadioGroup<String>(
+                          groupValue: alertMode,
+                          onChanged: (novoValor) {
+                            if (novoValor != null) {
+                              onAlertModeChanged(novoValor);
+                            }
+                          },
+                          child: Column(
+                            children: [
+                              _buildAlertModeOption(
+                                label: 'Notificações e Alarmes',
+                                value: 'both',
+                                textColor: textColor,
+                                fontSizeMultiplier: fontSizeMultiplier,
+                              ),
+                              _buildAlertModeOption(
+                                label: 'Apenas Notificações',
+                                value: 'notifications_only',
+                                textColor: textColor,
+                                fontSizeMultiplier: fontSizeMultiplier,
+                              ),
+                              _buildAlertModeOption(
+                                label: 'Apenas Alarmes',
+                                value: 'alarms_only',
+                                textColor: textColor,
+                                fontSizeMultiplier: fontSizeMultiplier,
+                              ),
+                            ],
+                          ),
                         ),
                         Divider(
                           height: 32.0 * fontSizeMultiplier,
@@ -399,16 +414,15 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 16.0 * fontSizeMultiplier),
 
-                  // Alarme em Primeiro Plano: permissão especial que deixa o
-                  // Alarme Principal abrir por cima de qualquer app (não só
-                  // quando o celular está bloqueado) — sem ela, o app usa a
-                  // notificação de tela cheia normal, que precisa ser tocada.
+                  // Saúde do Alarme: tudo o que o Android exige para o
+                  // alarme tocar na hora, com o status de cada item e um
+                  // atalho direto para a tela do sistema que o resolve.
                   _buildSettingsCard(
-                    title: 'Alarme em Primeiro Plano',
-                    icon: Icons.notifications_active_outlined,
+                    title: 'Saúde do Alarme',
+                    icon: Icons.health_and_safety_outlined,
                     textColor: textColor,
                     fontSizeMultiplier: fontSizeMultiplier,
-                    child: _OverlayPermissionCard(
+                    child: _AlarmHealthCard(
                       textColor: textColor,
                       subTextColor: subTextColor,
                       fontSizeMultiplier: fontSizeMultiplier,
@@ -478,10 +492,6 @@ class SettingsScreen extends StatelessWidget {
     final bool isSelected = alertMode == value;
     return RadioListTile<String>(
       value: value,
-      groupValue: alertMode,
-      onChanged: (novoValor) {
-        if (novoValor != null) onAlertModeChanged(novoValor);
-      },
       activeColor: currentTheme == 'Default'
           ? Colors.white
           : const Color(0xFF0D47A1),
@@ -579,28 +589,27 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-/// Status + botão da permissão "Exibir sobre outros apps". A concessão
-/// acontece numa tela do próprio Android, fora do app — por isso reconfere
-/// o status sempre que o usuário volta ao SeniCare (didChangeAppLifecycleState),
-/// o mesmo padrão já usado em HomeScreen para recarregar dados ao retomar.
-class _OverlayPermissionCard extends StatefulWidget {
+/// Checklist das permissões que decidem se o alarme toca. A concessão
+/// acontece em telas do próprio Android, fora do app — por isso reconfere o
+/// status sempre que o usuário volta ao SeniCare (didChangeAppLifecycleState).
+class _AlarmHealthCard extends StatefulWidget {
   final Color textColor;
   final Color subTextColor;
   final double fontSizeMultiplier;
 
-  const _OverlayPermissionCard({
+  const _AlarmHealthCard({
     required this.textColor,
     required this.subTextColor,
     required this.fontSizeMultiplier,
   });
 
   @override
-  State<_OverlayPermissionCard> createState() => _OverlayPermissionCardState();
+  State<_AlarmHealthCard> createState() => _AlarmHealthCardState();
 }
 
-class _OverlayPermissionCardState extends State<_OverlayPermissionCard>
+class _AlarmHealthCardState extends State<_AlarmHealthCard>
     with WidgetsBindingObserver {
-  bool? _concedida;
+  AlarmHealth? _saude;
 
   @override
   void initState() {
@@ -617,55 +626,125 @@ class _OverlayPermissionCardState extends State<_OverlayPermissionCard>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _verificar();
-    }
+    if (state == AppLifecycleState.resumed) _verificar();
   }
 
   Future<void> _verificar() async {
-    final bool concedida = await NotificationService().hasOverlayPermission();
-    if (mounted) setState(() => _concedida = concedida);
+    final AlarmHealth saude = await NotificationService()
+        .verificarSaudeDoAlarme();
+    if (!mounted) return;
+    final AlarmHealth? anterior = _saude;
+    setState(() => _saude = saude);
+    // "Exibir sobre outros apps" muda o que é agendado (alarme de overlay).
+    if (anterior != null && anterior.sobreporApps != saude.sobreporApps) {
+      NotificationService().sincronizarAlarmes();
+    }
+  }
+
+  Widget _item({
+    required String titulo,
+    required String descricao,
+    required bool ok,
+    required String tipo,
+    bool essencial = false,
+  }) {
+    final double m = widget.fontSizeMultiplier;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 14.0 * m),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            ok ? Icons.check_circle : Icons.error_outline,
+            color: ok
+                ? Colors.green
+                : (essencial ? Colors.redAccent : Colors.orange),
+            size: 24.0 * m,
+          ),
+          SizedBox(width: 10.0 * m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontSize: 16.0 * m,
+                    fontWeight: FontWeight.bold,
+                    color: widget.textColor,
+                  ),
+                ),
+                Text(
+                  descricao,
+                  style: TextStyle(
+                    fontSize: 13.0 * m,
+                    color: widget.subTextColor,
+                  ),
+                ),
+                if (!ok)
+                  Padding(
+                    padding: EdgeInsets.only(top: 6.0 * m),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: widget.textColor,
+                        side: BorderSide(color: widget.subTextColor),
+                      ),
+                      onPressed: () => NotificationService()
+                          .abrirConfiguracaoDePermissao(tipo),
+                      child: Text(
+                        'Permitir',
+                        style: TextStyle(fontSize: 15.0 * m),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double m = widget.fontSizeMultiplier;
-    final bool concedida = _concedida ?? false;
-
+    final AlarmHealth? saude = _saude;
+    if (saude == null) return const SizedBox.shrink();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Permite que o Alarme Principal abra por cima de qualquer tela, mesmo com o celular desbloqueado e em uso — sem precisar tocar numa notificação.',
-          style: TextStyle(fontSize: 14.0 * m, color: widget.subTextColor),
+        _item(
+          titulo: 'Notificações',
+          descricao: 'Sem esta permissão nenhum alarme ou lembrete aparece.',
+          ok: saude.notificacoes,
+          tipo: 'notifications',
+          essencial: true,
         ),
-        SizedBox(height: 12.0 * m),
-        Row(
-          children: [
-            Icon(
-              concedida ? Icons.check_circle : Icons.error_outline,
-              color: concedida ? Colors.green : Colors.orange,
-              size: 22.0 * m,
-            ),
-            SizedBox(width: 8.0 * m),
-            Expanded(
-              child: Text(
-                concedida ? 'Permissão concedida' : 'Permissão não concedida',
-                style: TextStyle(fontSize: 16.0 * m, color: widget.textColor),
-              ),
-            ),
-          ],
+        _item(
+          titulo: 'Alarmes no horário exato',
+          descricao: 'Garante que o alarme toque no minuto certo.',
+          ok: saude.alarmesExatos,
+          tipo: 'exactAlarms',
+          essencial: true,
         ),
-        if (!concedida) ...[
-          SizedBox(height: 12.0 * m),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => NotificationService().requestOverlayPermission(),
-              child: Text('Permitir', style: TextStyle(fontSize: 16.0 * m)),
-            ),
-          ),
-        ],
+        _item(
+          titulo: 'Alarme em tela cheia',
+          descricao: 'Mostra o alarme ocupando a tela, mesmo bloqueada.',
+          ok: saude.telaCheia,
+          tipo: 'fullScreen',
+        ),
+        _item(
+          titulo: 'Abrir por cima de outros apps',
+          descricao:
+              'Abre o alarme sozinho mesmo com o celular desbloqueado e em uso.',
+          ok: saude.sobreporApps,
+          tipo: 'overlay',
+        ),
+        _item(
+          titulo: 'Sem restrição de bateria',
+          descricao:
+              'Impede que a economia de bateria atrase ou cancele os alarmes.',
+          ok: saude.semOtimizacaoDeBateria,
+          tipo: 'batteryUnrestricted',
+        ),
       ],
     );
   }

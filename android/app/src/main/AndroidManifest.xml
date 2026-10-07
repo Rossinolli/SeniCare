@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 12 (API 31/32) usa SCHEDULE_EXACT_ALARM (concedida pelo
+         usuário numa tela do sistema); do 13 em diante, USE_EXACT_ALARM já
+         vem concedida para apps de alarme/lembrete. maxSdkVersion evita
+         declarar as duas ao mesmo tempo nas versões novas. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -13,13 +17,17 @@
          flutter_local_notifications continua funcionando normalmente como
          reserva para quem não conceder esta permissão). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Diálogo de um toque "permitir rodar em segundo plano" (Ajustes >
+         Saúde do Alarme): sem ele, fabricantes como Xiaomi/Samsung atrasam
+         ou matam os alarmes do app para economizar bateria. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- allowBackup/fullBackupContent desativados de propósito: o backup
          automático do Android (Google Drive) podia restaurar um
          SharedPreferences antigo/de outro aparelho por cima de uma
          instalação nova, fazendo o app "nascer" já com preferências erradas
          em vez de vazias (causa raiz do bug de "preferências iniciais"). -->
     <application
-        android:label="senicare"
+        android:label="SeniCare"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -56,6 +64,9 @@
              agendados (inclusive o Alarme Principal em tela cheia) disparem
              mesmo com o app fechado, e sejam reagendados após reiniciar o aparelho. -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- Botões "Tomei" e "Adiar 10 min" da própria notificação: tratados
+             em segundo plano, sem abrir o app. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <!-- Disparado pelo AlarmManager nativo, em paralelo à notificação de
              tela cheia acima: quando o app tem a permissão de overlay, abre
              o Alarme Principal diretamente por cima de qualquer app em uso,
