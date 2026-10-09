@@ -103,7 +103,7 @@ enum MotivoDeUso {
   diabetes('diabetes', 'Diabetes'),
   colesterol('colesterol', 'Colesterol'),
   coracao('coracao', 'Coração'),
-  circulacao('circulacao', 'Circulação / anticoagulante'),
+  circulacao('circulacao', 'Circulação / sangue'),
   infeccao('infeccao', 'Infecção'),
   alergia('alergia', 'Alergia'),
   respiracao('respiracao', 'Respiração'),
@@ -113,6 +113,7 @@ enum MotivoDeUso {
   sono('sono', 'Sono'),
   memoria('memoria', 'Memória'),
   ossos('ossos', 'Ossos / articulações'),
+  anticoncepcional('anticoncepcional', 'Anticoncepcional'),
   vitamina('vitamina', 'Vitamina / suplemento'),
   outro('outro', 'Outro');
 

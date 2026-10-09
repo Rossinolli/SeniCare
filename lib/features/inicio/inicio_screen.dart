@@ -186,7 +186,7 @@ class _ResumoDoDia extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progresso,
                 minHeight: 12,
-                backgroundColor: c.suave,
+                backgroundColor: c.trilha,
                 color: c.sucesso,
               ),
             ),

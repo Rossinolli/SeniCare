@@ -34,10 +34,47 @@ void main() {
       expect(DoseSchedule.dosesDoDia(med, terca), isEmpty);
     });
 
-    test('não gera doses antes do dia de início', () {
+    test('não cobra doses anteriores ao cadastro', () {
+      // Cadastrado em 01/09 às 10:00: a dose das 08:00 desse dia não conta
+      // (o remédio ainda nem existia); a partir do dia seguinte, sim.
       final med = medFixo();
       expect(DoseSchedule.dosesDoDia(med, DateTime(2026, 8, 31)), isEmpty);
-      expect(DoseSchedule.dosesDoDia(med, DateTime(2026, 9, 1)), hasLength(1));
+      expect(DoseSchedule.dosesDoDia(med, DateTime(2026, 9, 1)), isEmpty);
+      expect(DoseSchedule.dosesDoDia(med, DateTime(2026, 9, 2)), hasLength(1));
+    });
+
+    test('dose tomada pouco antes do cadastro ainda pode ser registrada', () {
+      final med = medFixo(cadastro: DateTime(2026, 9, 1, 8, 20));
+      expect(DoseSchedule.dosesDoDia(med, DateTime(2026, 9, 1)), [
+        DateTime(2026, 9, 1, 8),
+      ]);
+    });
+
+    test('00:00 é a meia-noite DESTA noite (bug "atrasada" ao cadastrar)', () {
+      // Cadastrado às 21:00 de segunda, todos os dias às 00:00.
+      final med = medFixo(
+        horarios: const [HoraDoDia(0, 0)],
+        cadastro: DateTime(2026, 9, 21, 21),
+      );
+      final hoje = DoseSchedule.dosesDoDia(med, segunda);
+      expect(hoje, [DateTime(2026, 9, 22)]); // a virada de segunda p/ terça
+      expect(DoseSchedule.diaDaDose(med, hoje.single), segunda);
+    });
+
+    test('00:00 em dia específico pertence àquele dia', () {
+      // Só às segundas, 00:00: a dose é na virada de segunda para terça.
+      final med = medFixo(horarios: const [HoraDoDia(0, 0)], dias: {1});
+      expect(DoseSchedule.dosesDoDia(med, segunda), [DateTime(2026, 9, 22)]);
+      expect(DoseSchedule.dosesDoDia(med, terca), isEmpty);
+    });
+
+    test('último dia do tratamento inclui a dose da meia-noite', () {
+      final med = medFixo(
+        horarios: const [HoraDoDia(0, 0)],
+        fim: DateTime(2026, 9, 21),
+      );
+      expect(DoseSchedule.dosesDoDia(med, segunda), hasLength(1));
+      expect(DoseSchedule.dosesDoDia(med, terca), isEmpty);
     });
 
     test('remédio antigo sem data de início não quebra (sempre ativo)', () {

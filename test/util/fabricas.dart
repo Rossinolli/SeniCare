@@ -10,13 +10,14 @@ Medicamento medFixo({
   DateTime? fim,
   DateTime? arquivadoEm,
   bool inicioNulo = false,
+  DateTime? cadastro,
 }) => Medicamento(
   id: id,
   nome: nome,
   horarios: horarios,
   diasSemana: dias,
   frequencia: FrequenciaTipo.horariosFixos,
-  dataInicio: inicioNulo ? null : DateTime(2026, 9, 1, 10),
+  dataInicio: inicioNulo ? null : (cadastro ?? DateTime(2026, 9, 1, 10)),
   dataFim: fim,
   arquivadoEm: arquivadoEm,
 );

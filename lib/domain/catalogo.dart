@@ -11,11 +11,24 @@ class ItemCatalogo {
   /// Nomes comerciais / sinônimos ('Novalgina' para Dipirona).
   final List<String> sinonimos;
 
-  /// Forma farmacêutica mais comum (chave de [FormaFarmaceutica]).
-  final String? forma;
+  /// Formas em que o remédio existe (chaves de [FormaFarmaceutica]); a
+  /// primeira é a mais comum e vem pré-selecionada. No cadastro, só estas
+  /// aparecem (Dipirona não mostra "Jato" nem "Unidades (UI)").
+  final List<String> formas;
+
+  /// Forma farmacêutica mais comum.
+  String? get forma => formas.isEmpty ? null : formas.first;
 
   /// Gramaturas comuns, já padronizadas ('500 mg').
   final List<String> dosagens;
+
+  /// Usos do remédio (chaves de [MotivoDeUso]); o primeiro é o mais comum
+  /// e vem pré-selecionado. No cadastro, "Para que serve?" mostra só estes —
+  /// menos opções para ler. Vazio quando os usos variam demais.
+  final List<String> motivos;
+
+  /// Uso mais comum, sugerido no cadastro.
+  String? get motivo => motivos.isEmpty ? null : motivos.first;
 
   final String _nomeNormalizado;
   final List<String> _sinonimosNormalizados;
@@ -23,18 +36,33 @@ class ItemCatalogo {
   ItemCatalogo({
     required this.nome,
     this.sinonimos = const [],
-    this.forma,
+    this.formas = const [],
     this.dosagens = const [],
+    this.motivos = const [],
   }) : _nomeNormalizado = normalizarBusca(nome),
        _sinonimosNormalizados = sinonimos.map(normalizarBusca).toList();
 
   factory ItemCatalogo.fromJson(Map<String, dynamic> json) => ItemCatalogo(
     nome: json['n'] as String,
     sinonimos: [for (final s in (json['a'] as List? ?? const [])) s as String],
-    forma: FormaFarmaceutica.daChave(json['f'] as String?)?.chave,
+    formas: [
+      // 'f' é uma lista de formas (v2) ou uma forma só (versões antigas).
+      for (final f in _lista(json['f'])) ?FormaFarmaceutica.daChave(f)?.chave,
+    ],
     dosagens: [for (final d in (json['d'] as List? ?? const [])) d as String],
+    motivos: [
+      // 'm' é uma lista de usos (v2) ou um uso só (versões antigas).
+      for (final m in _lista(json['m'])) ?MotivoDeUso.daChave(m)?.chave,
+    ],
   );
 }
+
+/// Campo do JSON que pode ser uma lista de textos ou um texto só.
+List<String> _lista(Object? valor) => switch (valor) {
+  final List<dynamic> l => [for (final v in l) v as String],
+  final String v => [v],
+  _ => const [],
+};
 
 /// Uma sugestão exibida no autocompletar.
 class SugestaoCatalogo {
@@ -62,11 +90,16 @@ class CatalogoMedicamentos {
           ItemCatalogo.fromJson(item as Map<String, dynamic>),
       ]);
 
-  /// Item cujo nome é exatamente [nome] (sem acento/caixa), se houver.
+  /// Item cujo nome — ou nome comercial ('Yasmin') — é exatamente [nome]
+  /// (sem acento/caixa), se houver.
   ItemCatalogo? porNome(String nome) {
     final String alvo = normalizarBusca(nome);
+    if (alvo.isEmpty) return null;
     for (final item in itens) {
       if (item._nomeNormalizado == alvo) return item;
+    }
+    for (final item in itens) {
+      if (item._sinonimosNormalizados.contains(alvo)) return item;
     }
     return null;
   }

@@ -34,7 +34,15 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
 
   /// Cards e painéis.
   final Color superficie;
+
+  /// Borda de cards e painéis. No tema Claro, ≥ 3:1 sobre a superfície
+  /// (WCAG 1.4.11); no Padrão e no Escuro, discreta (o fundo já separa).
   final Color borda;
+
+  /// Contorno de controles interativos não selecionados (opções, chips):
+  /// no tema Claro, mais forte que [borda] para deixar claro o que é
+  /// tocável; nos demais, igual à borda.
+  final Color bordaControle;
 
   /// Texto principal / secundário / sobre o botão principal.
   final Color texto;
@@ -52,6 +60,9 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
   /// Fundo suave de chips e itens não selecionados.
   final Color suave;
 
+  /// Trilho (parte vazia) de barras e anéis de progresso.
+  final Color trilha;
+
   /// Contorno dos campos de formulário.
   final Color campo;
 
@@ -64,6 +75,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     required this.fundo,
     required this.superficie,
     required this.borda,
+    required this.bordaControle,
     required this.texto,
     required this.textoSecundario,
     required this.destaque,
@@ -72,6 +84,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     required this.atencao,
     required this.perigo,
     required this.suave,
+    required this.trilha,
     required this.campo,
     required this.barraNavegacao,
     required this.barraDeStatus,
@@ -91,6 +104,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     fundo: azulMarcaEscuro,
     superficie: Color(0x24FFFFFF), // branco 14%
     borda: Color(0x66FFFFFF), // branco 40%
+    bordaControle: Color(0x66FFFFFF),
     texto: Colors.white,
     textoSecundario: Color(0xFFDCE8F7), // 6,5:1 sobre #1565C0
     destaque: Colors.white,
@@ -99,6 +113,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     atencao: Color(0xFFFFD166),
     perigo: Color(0xFFFFB4AB),
     suave: Color(0x1FFFFFFF),
+    trilha: Color(0x1FFFFFFF),
     campo: Color(0xCCFFFFFF),
     barraNavegacao: Color(0xFF0B3D91),
     barraDeStatus: SystemUiOverlayStyle.light,
@@ -106,9 +121,12 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
 
   static const CoresSeniCare claro = CoresSeniCare(
     tema: TemaApp.claro,
-    fundo: Color(0xFFF3F6FA), // cinza-azulado frio (sem tom amarelado)
+    fundo: Color(0xFFEDF1F6), // cinza-azulado frio (sem tom amarelado)
     superficie: Colors.white,
-    borda: Color(0xFFC9D2DE),
+    // Antes #C9D2DE (1,5:1 sobre o branco): as bordas sumiam no tema
+    // Claro. Agora 3:1 nos cards e 4,3:1 nos controles.
+    borda: Color(0xFF8796AB),
+    bordaControle: Color(0xFF6E7B8F),
     texto: Color(0xFF0F172A), // 17:1
     textoSecundario: Color(0xFF475569), // 7,5:1
     destaque: azulMarca,
@@ -117,6 +135,9 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     atencao: Color(0xFFB45309),
     perigo: Color(0xFFC62828),
     suave: Color(0xFFE8EEF6),
+    // O trilho em #E8EEF6 sumia sobre o branco: o anel do relatório parecia
+    // um semicírculo e a barra de progresso não aparecia.
+    trilha: Color(0xFFB9C5D5),
     campo: Color(0xFF6B778A), // 4,5:1 — contorno claramente visível
     barraNavegacao: Colors.white,
     barraDeStatus: SystemUiOverlayStyle.dark,
@@ -127,6 +148,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     fundo: Color(0xFF0B1220),
     superficie: Color(0xFF162032),
     borda: Color(0xFF2E3B52),
+    bordaControle: Color(0xFF2E3B52),
     texto: Color(0xFFF1F5F9),
     textoSecundario: Color(0xFFB8C4D6),
     destaque: Color(0xFF7AB8FF),
@@ -135,6 +157,7 @@ class CoresSeniCare extends ThemeExtension<CoresSeniCare> {
     atencao: Color(0xFFFBBF24),
     perigo: Color(0xFFF87171),
     suave: Color(0xFF1E2A40),
+    trilha: Color(0xFF1E2A40),
     campo: Color(0xFF8391A7),
     barraNavegacao: Color(0xFF111A2B),
     barraDeStatus: SystemUiOverlayStyle.light,
@@ -353,7 +376,9 @@ ThemeData construirTema(TemaApp tema) {
       iconTheme: IconThemeData(color: c.texto, size: 18),
       side: WidgetStateBorderSide.resolveWith(
         (s) => BorderSide(
-          color: s.contains(WidgetState.selected) ? c.destaque : c.borda,
+          color: s.contains(WidgetState.selected)
+              ? c.destaque
+              : c.bordaControle,
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

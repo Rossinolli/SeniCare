@@ -1,26 +1,23 @@
 // Tela que toma o celular inteiro na hora do remédio: mostra o remédio de
 // forma padronizada (nome, gramatura e quantidade, para que serve) e três
-// respostas — Tomei / Adiar 10 min / Não vou tomar.
+// respostas — Tomei / Adiar 10 min / Não vou tomar. Usa as cores do tema
+// escolhido em Ajustes (Padrão, Claro ou Escuro), como o resto do app.
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/componentes.dart';
 import '../../core/formatos.dart';
+import '../../core/tema.dart';
 import '../../data/repositorio.dart';
 import '../../domain/medicamento.dart';
 import '../../services/notification_service.dart';
 
-class _Paleta {
-  static const Color fundoTopo = Color(0xFF0B1B3F);
-  static const Color fundoBase = Color(0xFF07122A);
-  static const Color cartao = Color(0xFF16284F);
-  static const Color destaque = Color(0xFF38BDF8);
-  static const Color texto = Colors.white;
-  static const Color textoSecundario = Color(0xFFC7D6EE);
-  static const Color botaoSecundario = Color(0xFF9CC8F5);
-}
+/// Verde do "Tomei" em todos os temas: a resposta principal se reconhece
+/// pela cor (texto branco em negrito de 26 sp — texto grande, 3,3:1).
+const Color _verdeTomei = Color(0xFF16A34A);
 
 class AlarmScreen extends StatefulWidget {
   final AlarmLaunchInfo info;
@@ -44,8 +41,6 @@ class _AlarmScreenState extends State<AlarmScreen> {
   Timer? _vigia;
   bool _notificacaoEstavaAtiva = false;
 
-  bool get _teste => widget.info.ehTeste;
-
   @override
   void initState() {
     super.initState();
@@ -66,7 +61,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
     _horarioDose =
         widget.info.horarioDose ??
         await _notificacoes.horarioDaDose(widget.info.notificationId);
-    if (!_teste) {
+    {
       final Medicamento? med = await Repositorio.instance.porId(
         widget.info.medicamentoId,
       );
@@ -129,52 +124,46 @@ class _AlarmScreenState extends State<AlarmScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  Future<void> _fecharTeste() async {
-    _vigia?.cancel();
-    await _notificacoes.dispensar(widget.info.notificationId);
-    if (mounted) Navigator.of(context).pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     // Textos grandes por padrão; a escala de acessibilidade ainda vale, com
     // teto para a tela caber sem rolagem na maioria dos aparelhos.
     final MediaQueryData mq = MediaQuery.of(context);
-    return PopScope(
-      // O botão Voltar não dispensa o alarme: é preciso responder.
-      canPop: false,
-      child: MediaQuery(
-        data: mq.copyWith(
-          textScaler: mq.textScaler.clamp(maxScaleFactor: 1.35),
-        ),
-        child: Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [_Paleta.fundoTopo, _Paleta.fundoBase],
-              ),
-            ),
-            child: SafeArea(
-              child: _carregando
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
-                    )
-                  : LayoutBuilder(
-                      builder: (context, c) => SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: c.maxHeight),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 520),
-                              child: _conteudo(),
+    final c = context.cores;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: c.barraDeStatus,
+      child: PopScope(
+        // O botão Voltar não dispensa o alarme: é preciso responder.
+        canPop: false,
+        child: MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.35),
+          ),
+          child: Scaffold(
+            backgroundColor: c.fundo,
+            body: FundoDoTema(
+              child: SafeArea(
+                child: _carregando
+                    ? Center(
+                        child: CircularProgressIndicator(color: c.destaque),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, c) => SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: c.maxHeight),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 520,
+                                ),
+                                child: _conteudo(),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),
@@ -183,6 +172,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
   }
 
   Widget _conteudo() {
+    final c = context.cores;
     final Medicamento? med = _med;
     final DateTime? horario = _horarioDose;
     return Column(
@@ -192,26 +182,16 @@ class _AlarmScreenState extends State<AlarmScreen> {
         const _Sino(),
         const SizedBox(height: 16),
         Text(
-          _teste
-              ? 'Teste de alarme'
-              : (horario == null
-                    ? 'Hora do remédio'
-                    : 'Dose das ${hhmm(horario)}'),
-          style: const TextStyle(
-            color: _Paleta.textoSecundario,
+          horario == null ? 'Hora do remédio' : 'Dose das ${hhmm(horario)}',
+          style: TextStyle(
+            color: c.textoSecundario,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 20),
-        Container(
-          width: double.infinity,
+        Cartao(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: _Paleta.cartao,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: _Paleta.destaque.withValues(alpha: 0.35)),
-          ),
           child: Column(
             children: [
               if (med != null) ...[
@@ -221,8 +201,8 @@ class _AlarmScreenState extends State<AlarmScreen> {
               Text(
                 med?.nome ?? 'SeniCare',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: _Paleta.texto,
+                style: TextStyle(
+                  color: c.texto,
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
                   height: 1.15,
@@ -230,12 +210,10 @@ class _AlarmScreenState extends State<AlarmScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                _teste
-                    ? 'Os alarmes estão funcionando neste aparelho.'
-                    : (med?.textoDose ?? 'Tome a dose indicada na receita'),
+                med?.textoDose ?? 'Tome a dose indicada na receita',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: _Paleta.destaque,
+                style: TextStyle(
+                  color: c.destaque,
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
@@ -248,16 +226,13 @@ class _AlarmScreenState extends State<AlarmScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: c.suave,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     'Para: ${med!.textoMotivo}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: _Paleta.textoSecundario,
-                      fontSize: 18,
-                    ),
+                    style: TextStyle(color: c.textoSecundario, fontSize: 18),
                   ),
                 ),
               ],
@@ -265,9 +240,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        if (_teste)
-          _BotaoPrincipal(rotulo: 'Fechar teste', onPressed: _fecharTeste)
-        else ...[
+        ...[
           _BotaoPrincipal(
             rotulo: 'Tomei',
             icone: Icons.check_rounded,
@@ -308,24 +281,22 @@ class _Sino extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Container(
       width: 120,
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _Paleta.destaque.withValues(alpha: 0.15),
+        color: c.destaque.withValues(alpha: 0.18),
       ),
       alignment: Alignment.center,
       child: Container(
         width: 84,
         height: 84,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-        ),
-        child: const Icon(
+        decoration: BoxDecoration(shape: BoxShape.circle, color: c.destaque),
+        child: Icon(
           Icons.notifications_active_rounded,
-          color: Color(0xFF0369A1),
+          color: c.sobreDestaque,
           size: 44,
         ),
       ),
@@ -353,7 +324,7 @@ class _BotaoPrincipal extends StatelessWidget {
       height: 76,
       child: FilledButton(
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF16A34A),
+          backgroundColor: _verdeTomei,
           foregroundColor: Colors.white,
           disabledBackgroundColor: const Color(0xFF166534),
           shape: RoundedRectangleBorder(
@@ -399,12 +370,14 @@ class _BotaoSecundario extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return SizedBox(
       height: 64,
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
-          foregroundColor: _Paleta.botaoSecundario,
-          side: const BorderSide(color: _Paleta.botaoSecundario, width: 1.4),
+          foregroundColor: c.destaque,
+          backgroundColor: c.superficie,
+          side: BorderSide(color: c.destaque, width: 1.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

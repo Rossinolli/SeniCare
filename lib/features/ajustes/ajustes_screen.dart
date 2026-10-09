@@ -146,23 +146,6 @@ class AjustesScreen extends ConsumerWidget {
                       secondary: const Icon(Icons.vibration_rounded),
                       onChanged: ctrl.definirVibracao,
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.alarm_on_rounded),
-                        label: const Text('Testar alarme (toca em 10 s)'),
-                        onPressed: () async {
-                          await NotificationService().testarAlarme();
-                          if (context.mounted) {
-                            avisar(
-                              context,
-                              'O alarme de teste vai tocar em 10 segundos.',
-                            );
-                          }
-                        },
-                      ),
-                    ),
                   ],
                 ),
               ),

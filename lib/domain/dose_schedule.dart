@@ -46,35 +46,55 @@ class DoseSchedule {
   static DateTime _diaSeguinte(DateTime d) =>
       DateTime(d.year, d.month, d.day + 1);
 
-  /// Primeiro instante em que o tratamento vale (início do dia de início).
-  /// Remédios anteriores à versão 5 do banco não têm essa data — são
-  /// tratados como "sempre ativos".
+  /// Tolerância para doses um pouco anteriores ao cadastro: quem cadastra
+  /// às 08:10 o remédio que acabou de tomar às 08:00 ainda consegue
+  /// registrar essa dose.
+  static const Duration toleranciaDoCadastro = Duration(minutes: 30);
+
+  static bool _ehMeiaNoite(DateTime t) =>
+      t.hour == 0 && t.minute == 0 && t.second == 0 && t.millisecond == 0;
+
+  /// Dia (início do dia) a que pertence uma dose agendada para [horario].
+  ///
+  /// "Paradoxo da meia-noite": para as pessoas, a dose das 00:00 é a da
+  /// meia-noite DESTA noite — fecha o dia, não o abre. Então o dia vai de
+  /// 00:00:01 até 00:00:00 do dia seguinte, nos dois modos de frequência
+  /// (antes valia só no modo Intervalo, e "todos os dias às 00:00"
+  /// aparecia como atrasada logo depois de cadastrado).
+  static DateTime diaDaDose(Medicamento med, DateTime horario) =>
+      _ehMeiaNoite(horario)
+      ? inicioDoDia(horario.subtract(const Duration(seconds: 1)))
+      : inicioDoDia(horario);
+
+  /// Primeiro dia do tratamento. Remédios anteriores à versão 5 do banco
+  /// não têm data de início — são tratados como "sempre ativos".
   static DateTime inicioDoTratamento(Medicamento med) {
     final DateTime? inicio = med.dataInicio;
     return inicio == null ? DateTime(2000) : inicioDoDia(inicio);
   }
 
-  /// Primeiro instante em que o tratamento JÁ NÃO vale: meia-noite do dia
-  /// seguinte à data final, ou o momento em que o remédio foi removido —
-  /// o que vier primeiro. null em Uso Contínuo ainda ativo.
-  static DateTime? fimDoTratamento(Medicamento med) {
-    final DateTime? fim = med.dataFim == null
-        ? null
-        : _diaSeguinte(med.dataFim!);
-    final DateTime? arquivado = med.arquivadoEm;
-    if (fim == null) return arquivado;
-    if (arquivado == null) return fim;
-    return arquivado.isBefore(fim) ? arquivado : fim;
-  }
-
+  /// A dose de [t] vale? Regras, nesta ordem:
+  ///  * pertence a um dia entre o início e a data final do tratamento;
+  ///  * não é anterior ao CADASTRO (com tolerância) — um remédio cadastrado
+  ///    às 21h não cobra a dose das 08h daquele mesmo dia;
+  ///  * não é posterior à remoção do remédio.
   static bool _dentroDoTratamento(Medicamento med, DateTime t) {
-    if (t.isBefore(inicioDoTratamento(med))) return false;
-    final DateTime? fim = fimDoTratamento(med);
-    return fim == null || t.isBefore(fim);
+    final DateTime dia = diaDaDose(med, t);
+    if (dia.isBefore(inicioDoTratamento(med))) return false;
+    if (med.dataFim != null && dia.isAfter(inicioDoDia(med.dataFim!))) {
+      return false;
+    }
+    final DateTime? cadastro = med.dataInicio;
+    if (cadastro != null &&
+        t.isBefore(cadastro.subtract(toleranciaDoCadastro))) {
+      return false;
+    }
+    final DateTime? arquivado = med.arquivadoEm;
+    return arquivado == null || t.isBefore(arquivado);
   }
 
   /// Todas as doses de [med] com instante em [de, ate), em ordem, até
-  /// [limite] doses. Já respeita início, fim e remoção do tratamento.
+  /// [limite] doses. Já respeita início, fim, cadastro e remoção.
   static List<DateTime> dosesEntre(
     Medicamento med,
     DateTime de,
@@ -111,48 +131,36 @@ class DoseSchedule {
     }
 
     if (med.diasSemana.isEmpty) return doses;
+    // Começa um dia antes: a dose "das 00:00" de um dia acontece na virada
+    // para o dia seguinte e pode cair dentro de [de, ate).
     for (
-      DateTime dia = inicioDoDia(de);
+      DateTime dia = inicioDoDia(de).subtract(const Duration(days: 1));
       dia.isBefore(ate) && !cheio();
       dia = _diaSeguinte(dia)
     ) {
       if (!med.diasSemana.contains(dia.weekday)) continue;
       for (final HoraDoDia h in horarios) {
-        final DateTime t = h.noDia(dia);
+        final DateTime t = h.emMinutos == 0 ? _diaSeguinte(dia) : h.noDia(dia);
         if (t.isBefore(de) || !t.isBefore(ate)) continue;
         if (!_dentroDoTratamento(med, t)) continue;
         doses.add(t);
-        if (cheio()) break;
       }
     }
-    return doses;
+    doses.sort();
+    return limite == null || doses.length <= limite
+        ? doses
+        : doses.sublist(0, limite);
   }
 
-  /// Doses que pertencem ao dia [dia], do ponto de vista do usuário.
-  ///
-  /// No modo Intervalo vale o "paradoxo da meia-noite": a dose das 00:00
-  /// fecha o dia anterior (08h, 16h, 00h = as 3 doses de hoje), então o dia
-  /// vai de 00:00:01 até 00:00:00 do dia seguinte.
+  /// Doses que pertencem ao dia [dia], do ponto de vista do usuário (de
+  /// 00:00:01 até a meia-noite seguinte — ver [diaDaDose]).
   static List<DateTime> dosesDoDia(Medicamento med, DateTime dia) {
-    final DateTime inicio = inicioDoDia(dia);
-    final DateTime fim = _diaSeguinte(dia);
-    if (med.frequencia == FrequenciaTipo.intervalo) {
-      const Duration umSegundo = Duration(seconds: 1);
-      return dosesEntre(med, inicio.add(umSegundo), fim.add(umSegundo));
-    }
-    return dosesEntre(med, inicio, fim);
-  }
-
-  /// Dia (início do dia) a que pertence a dose agendada para [horario] —
-  /// a regra inversa de [dosesDoDia].
-  static DateTime diaDaDose(Medicamento med, DateTime horario) {
-    if (med.frequencia == FrequenciaTipo.intervalo &&
-        horario.hour == 0 &&
-        horario.minute == 0 &&
-        horario.second == 0) {
-      return inicioDoDia(horario.subtract(const Duration(seconds: 1)));
-    }
-    return inicioDoDia(horario);
+    const Duration umSegundo = Duration(seconds: 1);
+    return dosesEntre(
+      med,
+      inicioDoDia(dia).add(umSegundo),
+      _diaSeguinte(dia).add(umSegundo),
+    );
   }
 
   /// Próximas doses estritamente depois de [apos], dentro de [janela].

@@ -29,7 +29,6 @@ import '../domain/medicamento.dart';
 
 /// Pedido para abrir a tela de alarme de uma dose.
 class AlarmLaunchInfo {
-  /// 0 = alarme de teste (Ajustes > Testar alarme).
   final int medicamentoId;
   final int notificationId;
 
@@ -41,8 +40,6 @@ class AlarmLaunchInfo {
     required this.notificationId,
     this.horarioDose,
   });
-
-  bool get ehTeste => medicamentoId == NotificationService.idMedicamentoTeste;
 }
 
 /// Estado das permissões/configurações do Android que decidem se o alarme
@@ -138,8 +135,6 @@ class NotificationService {
   /// serviço segue sem o alarme de overlay (a notificação continua).
   static const MethodChannel _nativo = MethodChannel('senicare/overlay_alarm');
 
-  static const int idMedicamentoTeste = 0;
-
   /// Nome da porta pela qual a interface (motor principal) recebe avisos
   /// de mudança vindos dos motores de segundo plano — os dois rodam no mesmo
   /// processo, então compartilham o IsolateNameServer.
@@ -185,9 +180,8 @@ class NotificationService {
   static const int _maxOcorrenciasPorMed = 24;
 
   // Faixas de ID separadas por tipo, sem colisão possível:
-  //   teste = 999.999.999 | estoque = 1000 + medId
+  //   estoque = 1000 + medId
   //   adiar = 600.000.000 + medId | lembrete/alarme = hash em [1e9, 2,1e9)
-  static const int _idTeste = 999999999;
   static int _idEstoque(int medId) => 1000 + medId;
   static int _idAdiamento(int medId) => 600000000 + medId;
 
@@ -440,10 +434,10 @@ class NotificationService {
   }
 
   /// Payload: 'tipo:medId:notificationId[:assinatura[:horarioDoseMs]]'.
-  /// Só 'alarm', 'snooze' e 'teste' abrem a AlarmScreen.
+  /// Só 'alarm' e 'snooze' abrem a AlarmScreen.
   AlarmLaunchInfo? _alarmeDoPayload(String? payload) {
     final _Payload? p = _Payload.ler(payload);
-    if (p == null || !const {'alarm', 'snooze', 'teste'}.contains(p.tipo)) {
+    if (p == null || !const {'alarm', 'snooze'}.contains(p.tipo)) {
       return null;
     }
     return AlarmLaunchInfo(
@@ -618,9 +612,9 @@ class NotificationService {
     int cancelados = 0;
     for (final p in pendentes) {
       final _Payload? info = _Payload.ler(p.payload);
-      if (info?.tipo == 'snooze' || info?.tipo == 'teste') {
+      if (info?.tipo == 'snooze') {
         // Avulsos: só somem se o remédio foi removido.
-        if (info!.tipo == 'snooze' && !idsAtivos.contains(info.medId)) {
+        if (!idsAtivos.contains(info!.medId)) {
           await _cancelar(p.id, overlay: overlay != null);
           cancelados++;
         }
@@ -907,28 +901,6 @@ class NotificationService {
         payload:
             'snooze:${med.id}:$id:0:${horarioDose?.millisecondsSinceEpoch ?? ''}',
         detalhes: _detalhesDoAlarme(prefs, comAcoes: true),
-        telaCheia: prefs.modoAviso.telaCheia,
-      ),
-      overlay: prefs.modoAviso.telaCheia
-          ? await _temPermissaoDeOverlay()
-          : false,
-    );
-  }
-
-  /// Ajustes > Testar alarme: toca um alarme de verdade em 10 segundos, para
-  /// o usuário (ou o cuidador) conferir se o aparelho está configurado.
-  Future<void> testarAlarme() async {
-    final Preferencias prefs = await Preferencias.lerAtualizado();
-    await _cancelar(_idTeste);
-    await _agendar(
-      _AvisoDesejado(
-        id: _idTeste,
-        medId: idMedicamentoTeste,
-        titulo: 'Teste do SeniCare',
-        corpo: 'Se você está vendo isto, os alarmes estão funcionando.',
-        quando: tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10)),
-        payload: 'teste:$idMedicamentoTeste:$_idTeste',
-        detalhes: _detalhesDoAlarme(prefs, comAcoes: false),
         telaCheia: prefs.modoAviso.telaCheia,
       ),
       overlay: prefs.modoAviso.telaCheia

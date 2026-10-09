@@ -18,7 +18,7 @@ ficam só no aparelho.
 | **Alarme** | Tela cheia com o remédio padronizado ("Losartana · 50 mg · 1 comprimido · Para: Pressão alta") e as respostas Tomei / Adiar 10 min / Não vou tomar. Botões **Tomei** e **Adiar** também na própria notificação. Lembrete 30 min antes (opcional). |
 | **Histórico** | Calendário com marcação por dia, doses de cada dia (inclusive de remédios removidos) e **remédios já utilizados** — remover um remédio não apaga o passado. |
 | **Relatório** | Adesão dos últimos 7 dias, dia a dia, compartilhável em texto (WhatsApp, e-mail...). |
-| **Ajustes** | Tema (Padrão azul, Claro, Escuro), tamanho do texto até 160% (somado à acessibilidade do Android), modo de aviso, som, vibração, **testar alarme**, painel "Saúde do alarme" com cada permissão necessária, estoque e compartilhamento da lista de remédios. |
+| **Ajustes** | Tema (Padrão azul, Claro, Escuro), tamanho do texto até 160% (somado à acessibilidade do Android), modo de aviso, som, vibração, painel "Saúde do alarme" com cada permissão necessária, estoque e compartilhamento da lista de remédios. |
 
 ## Como rodar
 

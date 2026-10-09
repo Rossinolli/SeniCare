@@ -165,7 +165,7 @@ class _Anel extends StatelessWidget {
                     child: CircularProgressIndicator(
                       value: total == 0 ? 0 : adesao,
                       strokeWidth: 14,
-                      backgroundColor: c.suave,
+                      backgroundColor: c.trilha,
                       color: cor,
                       strokeCap: StrokeCap.round,
                     ),

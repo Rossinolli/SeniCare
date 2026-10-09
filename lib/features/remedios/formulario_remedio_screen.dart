@@ -65,6 +65,12 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
   FormaFarmaceutica _forma = FormaFarmaceutica.comprimido;
   MotivoDeUso? _motivo;
 
+  /// "Ver todos" em "Para que serve?" (por padrão, só os usos do remédio).
+  bool _verTodosMotivos = false;
+
+  /// "Outras" em formas (por padrão, só as formas em que o remédio existe).
+  bool _verTodasFormas = false;
+
   FrequenciaTipo _frequencia = FrequenciaTipo.horariosFixos;
   final List<HoraDoDia> _horarios = [];
   final Set<int> _dias = {1, 2, 3, 4, 5, 6, 7};
@@ -160,6 +166,16 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
       _nome.text = s.item.nome;
       final FormaFarmaceutica? forma = FormaFarmaceutica.daChave(s.item.forma);
       if (forma != null) _forma = forma;
+      // Sugere o uso mais comum do remédio. Se o motivo marcado não é um
+      // dos usos deste remédio (ex.: trocou o nome), troca pela sugestão.
+      _verTodosMotivos = false;
+      _verTodasFormas = false;
+      if (_motivo == null ||
+          (s.item.motivos.isNotEmpty &&
+              _motivo != MotivoDeUso.outro &&
+              !s.item.motivos.contains(_motivo!.chave))) {
+        _motivo = MotivoDeUso.daChave(s.item.motivo) ?? _motivo;
+      }
       // Uma única gramatura comum: já vem marcada.
       if (s.item.dosagens.length == 1) _dosagem = s.item.dosagens.single;
     });
@@ -312,15 +328,13 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
                 const SizedBox(height: 16),
                 Text('Unidade', style: ctx.textos.labelLarge),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
+                GrupoDeOpcoes(
+                  opcoes: [
                     for (final u in unidadesDeDosagem)
-                      ChoiceChip(
-                        label: Text(u),
-                        selected: unidade == u,
-                        onSelected: (_) => setLocal(() => unidade = u),
+                      Opcao(
+                        rotulo: u,
+                        selecionada: unidade == u,
+                        onTap: () => setLocal(() => unidade = u),
                       ),
                   ],
                 ),
@@ -658,6 +672,10 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
   Widget _secaoDose() {
     final ItemCatalogo? item =
         _itemCatalogo ?? ref.watch(catalogoProvider).value?.porNome(_nome.text);
+    // Só as formas em que o remédio existe (Dipirona: comprimido, gotas,
+    // mL), mais a já marcada. "Outras" devolve a lista completa.
+    final bool filtrarFormas =
+        !_verTodasFormas && item != null && item.formas.isNotEmpty;
     final List<String> opcoes = [
       ...?item?.dosagens,
       if (_dosagem != null && !(item?.dosagens.contains(_dosagem) ?? false))
@@ -669,20 +687,21 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
       [
         Text('Gramatura', style: context.textos.labelLarge),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        GrupoDeOpcoes(
+          opcoes: [
             for (final d in opcoes)
-              ChoiceChip(
-                label: Text(d),
-                selected: _dosagem == d,
-                onSelected: (sel) => setState(() => _dosagem = sel ? d : null),
+              Opcao(
+                rotulo: d,
+                selecionada: _dosagem == d,
+                onTap: () =>
+                    setState(() => _dosagem = _dosagem == d ? null : d),
               ),
-            ActionChip(
-              avatar: const Icon(Icons.edit_rounded, size: 18),
-              label: Text(opcoes.isEmpty ? 'Informar gramatura' : 'Outra'),
-              onPressed: _outraDosagem,
+            Opcao(
+              rotulo: opcoes.isEmpty ? 'Informar gramatura' : 'Outra',
+              icone: Icons.edit_rounded,
+              noFim: true,
+              selecionada: false,
+              onTap: _outraDosagem,
             ),
           ],
         ),
@@ -695,21 +714,30 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
           aoMudar: (q) => setState(() => _quantidade = q),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        GrupoDeOpcoes(
+          opcoes: [
             for (final f in FormaFarmaceutica.values)
-              ChoiceChip(
-                label: Text(f.rotulo),
-                selected: _forma == f,
-                onSelected: (_) => setState(() {
-                  _forma = f;
-                  // Ajusta a quantidade ao passo da nova forma (sem ½ gota).
-                  _quantidade = (_quantidade / f.passo).round() * f.passo;
-                  if (_quantidade < f.passo) _quantidade = f.passo;
-                  if (_quantidade > f.maximo) _quantidade = f.maximo;
-                }),
+              if (!filtrarFormas ||
+                  item.formas.contains(f.chave) ||
+                  f == _forma)
+                Opcao(
+                  rotulo: f.rotulo,
+                  selecionada: _forma == f,
+                  onTap: () => setState(() {
+                    _forma = f;
+                    // Ajusta a quantidade ao passo da nova forma (sem ½ gota).
+                    _quantidade = (_quantidade / f.passo).round() * f.passo;
+                    if (_quantidade < f.passo) _quantidade = f.passo;
+                    if (_quantidade > f.maximo) _quantidade = f.maximo;
+                  }),
+                ),
+            if (filtrarFormas)
+              Opcao(
+                rotulo: 'Outras',
+                icone: Icons.expand_more_rounded,
+                noFim: true,
+                selecionada: false,
+                onTap: () => setState(() => _verTodasFormas = true),
               ),
           ],
         ),
@@ -718,16 +746,37 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
   }
 
   Widget _secaoMotivo() {
-    return _secao('Para que serve?', ajuda: 'Opcional — aparece no alarme.', [
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final m in MotivoDeUso.values)
-            ChoiceChip(
-              label: Text(m.rotulo),
-              selected: _motivo == m,
-              onSelected: (sel) => setState(() => _motivo = sel ? m : null),
+    final ItemCatalogo? item =
+        _itemCatalogo ?? ref.watch(catalogoProvider).value?.porNome(_nome.text);
+    // Só os usos do remédio escolhido (menos opções para ler), mais o já
+    // marcado e "Outro". "Ver todos" devolve a lista completa.
+    final bool filtrar =
+        !_verTodosMotivos && item != null && item.motivos.isNotEmpty;
+    final List<MotivoDeUso> visiveis = [
+      for (final m in MotivoDeUso.values)
+        if (!filtrar ||
+            item.motivos.contains(m.chave) ||
+            m == _motivo ||
+            m == MotivoDeUso.outro)
+          m,
+    ];
+    return _secao('Para que serve?', [
+      GrupoDeOpcoes(
+        opcoes: [
+          for (final m in visiveis)
+            Opcao(
+              rotulo: m.rotulo,
+              noFim: m == MotivoDeUso.outro,
+              selecionada: _motivo == m,
+              onTap: () => setState(() => _motivo = _motivo == m ? null : m),
+            ),
+          if (filtrar)
+            Opcao(
+              rotulo: 'Ver todos',
+              icone: Icons.expand_more_rounded,
+              noFim: true,
+              selecionada: false,
+              onTap: () => setState(() => _verTodosMotivos = true),
             ),
         ],
       ),
@@ -824,18 +873,18 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
             ),
           ],
         ),
-        Wrap(
-          spacing: 6,
-          runSpacing: 8,
-          children: [
+        GrupoDeOpcoes(
+          comMarca: false,
+          espaco: 6,
+          opcoes: [
             for (int d = 1; d <= 7; d++)
-              FilterChip(
-                label: Text(DoseSchedule.diasDaSemana[d - 1]),
-                selected: _dias.contains(d),
-                showCheckmark: false,
-                tooltip: DoseSchedule.diasDaSemanaExtenso[d - 1],
-                onSelected: (sel) =>
-                    setState(() => sel ? _dias.add(d) : _dias.remove(d)),
+              Opcao(
+                rotulo: DoseSchedule.diasDaSemana[d - 1],
+                dica: DoseSchedule.diasDaSemanaExtenso[d - 1],
+                selecionada: _dias.contains(d),
+                onTap: () => setState(
+                  () => _dias.contains(d) ? _dias.remove(d) : _dias.add(d),
+                ),
               ),
           ],
         ),
@@ -843,26 +892,26 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
       ] else ...[
         Text('De quantas em quantas horas?', style: context.textos.labelLarge),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        GrupoDeOpcoes(
+          opcoes: [
             for (final h in _intervalosComuns)
-              ChoiceChip(
-                label: Text('$h em $h h'),
-                selected: _intervalo == h,
-                onSelected: (_) => setState(() => _intervalo = h),
+              Opcao(
+                rotulo: '$h em $h h',
+                selecionada: _intervalo == h,
+                onTap: () => setState(() => _intervalo = h),
               ),
             if (!_intervalosComuns.contains(_intervalo))
-              ChoiceChip(
-                label: Text('$_intervalo em $_intervalo h'),
-                selected: true,
-                onSelected: (_) {},
+              Opcao(
+                rotulo: '$_intervalo em $_intervalo h',
+                selecionada: true,
+                onTap: () {},
               ),
-            ActionChip(
-              avatar: const Icon(Icons.tune_rounded, size: 18),
-              label: const Text('Outro'),
-              onPressed: () async {
+            Opcao(
+              rotulo: 'Outro',
+              icone: Icons.tune_rounded,
+              noFim: true,
+              selecionada: false,
+              onTap: () async {
                 final int? h = await _escolherIntervalo();
                 if (h != null && mounted) setState(() => _intervalo = h);
               },
