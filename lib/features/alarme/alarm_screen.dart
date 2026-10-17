@@ -190,53 +190,57 @@ class _AlarmScreenState extends State<AlarmScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        Cartao(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              if (med != null) ...[
-                AvatarRemedio(fotoPath: med.fotoPath, raio: 44),
-                const SizedBox(height: 14),
+        SizedBox(
+          // O card ocupa a largura toda, como os botões abaixo.
+          width: double.infinity,
+          child: Cartao(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                if (med != null) ...[
+                  AvatarRemedio(fotoPath: med.fotoPath, raio: 44),
+                  const SizedBox(height: 14),
+                ],
+                Text(
+                  med?.nome ?? 'SeniCare',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: c.texto,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  med?.textoDose ?? 'Tome a dose indicada na receita',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: c.destaque,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (med?.textoMotivo != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: c.suave,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Para: ${med!.textoMotivo}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: c.textoSecundario, fontSize: 18),
+                    ),
+                  ),
+                ],
               ],
-              Text(
-                med?.nome ?? 'SeniCare',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: c.texto,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                med?.textoDose ?? 'Tome a dose indicada na receita',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: c.destaque,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (med?.textoMotivo != null) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: c.suave,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'Para: ${med!.textoMotivo}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: c.textoSecundario, fontSize: 18),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 32),
