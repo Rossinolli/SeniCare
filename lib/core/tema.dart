@@ -295,7 +295,13 @@ ThemeData construirTema(TemaApp tema) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      systemOverlayStyle: c.barraDeStatus,
+      // Barra de botões do Android na cor do tema em todas as telas
+      // (sem isso, ficava preta no cadastro e no relatório).
+      systemOverlayStyle: c.barraDeStatus.copyWith(
+        systemNavigationBarColor: c.barraNavegacao,
+        systemNavigationBarIconBrightness:
+            c.barraDeStatus.statusBarIconBrightness,
+      ),
       titleTextStyle: textos.titleLarge,
     ),
     inputDecorationTheme: InputDecorationTheme(

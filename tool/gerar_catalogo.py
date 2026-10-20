@@ -1,5 +1,7 @@
 """Gera assets/data/medicamentos_br.json (catálogo do autocompletar) a partir
-das listas em tool/catalogo_base.py e tool/catalogo_novos.py, validando:
+das listas curadas em tool/catalogo_base.py e tool/catalogo_novos.py e da
+base oficial da ANVISA resumida em tool/dados/anvisa_resumo.json (ver
+tool/importar_anvisa.py), validando:
 
 * nomes únicos (sem diferenciar acento/maiúscula);
 * nenhum sinônimo repetido entre medicamentos diferentes;
@@ -23,6 +25,8 @@ from catalogo_base import BASE  # noqa: E402
 from catalogo_novos import NOVOS  # noqa: E402
 from catalogo_formas import FORMAS as FORMAS_DO_ITEM  # noqa: E402
 from catalogo_motivos import MOTIVOS as MOTIVOS_DO_ITEM  # noqa: E402
+from classes_anvisa import motivos_da_classe  # noqa: E402
+from importar_anvisa import chave as chave_anvisa  # noqa: E402
 
 FORMAS = {
     "comprimido", "capsula", "cápsula", "gotas", "ml", "mL", "sache", "sachê",
@@ -110,12 +114,16 @@ def main() -> None:
         print("\n".join(erros))
         sys.exit(1)
 
+    curados = len(itens)
+    marcas = juntar_anvisa(itens, nomes, sinonimos)
+
     itens.sort(key=lambda i: normalizar(i["n"]))
     saida = {
-        "versao": 2,
+        "versao": 3,
         "fonte": (
-            "Curadoria SeniCare: medicamentos de uso comum no Brasil (DCB / "
-            "RENAME), com nomes de referência e similares como sinônimos. As "
+            "Curadoria SeniCare (medicamentos de uso comum, com formas, "
+            "gramaturas e usos) + base oficial da ANVISA (dados abertos, "
+            "registros ativos), com os nomes comerciais como sinônimos. As "
             "dosagens são atalhos — confira sempre na embalagem ou receita."
         ),
         "itens": itens,
@@ -126,7 +134,49 @@ def main() -> None:
     destino = RAIZ / "assets" / "data" / "medicamentos_br.json"
     io.open(destino, "w", encoding="utf-8").write(texto + "\n")
     com_motivo = sum(1 for i in itens if "m" in i)
-    print(f"{len(itens)} medicamentos ({com_motivo} com motivo sugerido) -> {destino}")
+    nomes_busca = len(itens) + sum(len(i["a"]) for i in itens)
+    print(
+        f"{len(itens)} medicamentos ({curados} curados, "
+        f"{len(itens) - curados} da ANVISA; {com_motivo} com motivo sugerido); "
+        f"{marcas} nomes comerciais da ANVISA; {nomes_busca} nomes buscáveis "
+        f"-> {destino}"
+    )
+
+
+def juntar_anvisa(itens, nomes, sinonimos) -> int:
+    """Acrescenta a base da ANVISA: os nomes comerciais viram sinônimos do
+    item curado do mesmo princípio ativo; princípios sem curadoria viram
+    itens novos (sem forma/gramatura: o app mostra todas as opções), com o
+    motivo deduzido da classe terapêutica. Devolve quantas marcas entraram."""
+    caminho = RAIZ / "tool" / "dados" / "anvisa_resumo.json"
+    base = json.loads(io.open(caminho, encoding="utf-8").read())["itens"]
+    por_chave = {chave_anvisa(i["n"]): i for i in itens}
+    marcas = 0
+
+    def sinonimo_livre(nome_marca: str) -> bool:
+        k = normalizar(nome_marca)
+        return k not in sinonimos and k not in nomes
+
+    for g in base:
+        item = por_chave.get(g["chave"])
+        if item is None:
+            if normalizar(g["nome"]) in nomes:
+                continue
+            item = {"n": g["nome"], "a": [], "f": [], "d": []}
+            classes = [normalizar(c).upper() for c in g["classes"]]
+            motivos = motivos_da_classe(classes)
+            if motivos:
+                item["m"] = motivos
+            nomes[normalizar(g["nome"])] = g["nome"]
+            por_chave[g["chave"]] = item
+            itens.append(item)
+        for marca in g["marcas"]:
+            # Marca repetida entre princípios (raro) fica com o primeiro.
+            if sinonimo_livre(marca):
+                item["a"].append(marca)
+                sinonimos[normalizar(marca)] = item["n"]
+                marcas += 1
+    return marcas
 
 
 if __name__ == "__main__":

@@ -113,6 +113,9 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "hasOverlayPermission" -> result.success(Settings.canDrawOverlays(this))
                 "getAlarmHealth" -> result.success(saudeDoAlarme())
+                // Caminho do APK instalado, para "Indicar o SeniCare" enviar
+                // o próprio aplicativo a outra pessoa.
+                "apkPath" -> result.success(applicationInfo.sourceDir)
                 "openPermissionSettings" -> {
                     abrirConfiguracao(call.argument<String>("kind"))
                     result.success(null)

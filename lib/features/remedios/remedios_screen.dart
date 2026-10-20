@@ -112,6 +112,10 @@ class _CartaoRemedio extends StatelessWidget {
         ),
     ];
 
+    // Ícones acompanham o tamanho do texto (na fonte máxima ficavam
+    // pequenos e acima da linha).
+    final TextScaler escala = MediaQuery.textScalerOf(context);
+    final double icone = escala.scale(20).clamp(20, 32);
     return Opacity(
       opacity: encerrado ? 0.7 : 1,
       child: Cartao(
@@ -131,13 +135,24 @@ class _CartaoRemedio extends StatelessWidget {
                     _Etiqueta(m.textoMotivo!),
                   ],
                   const SizedBox(height: 8),
-                  for (final (icone, texto) in linhas)
+                  for (final (ic, texto) in linhas)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(icone, size: 20, color: c.textoSecundario),
+                          // Centraliza o ícone na altura da 1ª linha.
+                          SizedBox(
+                            height: escala.scale(
+                              (context.textos.bodyMedium?.fontSize ?? 16) *
+                                  (context.textos.bodyMedium?.height ?? 1.4),
+                            ),
+                            child: Icon(
+                              ic,
+                              size: icone,
+                              color: c.textoSecundario,
+                            ),
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -153,6 +168,8 @@ class _CartaoRemedio extends StatelessWidget {
                 ],
               ),
             ),
+            // Espaço próprio para o lápis: o nome não encosta nele.
+            const SizedBox(width: 8),
             Icon(Icons.edit_rounded, color: c.textoSecundario),
           ],
         ),

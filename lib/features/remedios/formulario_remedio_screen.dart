@@ -163,7 +163,7 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
   void _aoEscolherDoCatalogo(SugestaoCatalogo s) {
     setState(() {
       _itemCatalogo = s.item;
-      _nome.text = s.item.nome;
+      _nome.text = s.nomeEscolhido;
       final FormaFarmaceutica? forma = FormaFarmaceutica.daChave(s.item.forma);
       if (forma != null) _forma = forma;
       // Sugere o uso mais comum do remédio. Se o motivo marcado não é um
@@ -632,7 +632,10 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
             child: RawAutocomplete<SugestaoCatalogo>(
               textEditingController: _nome,
               focusNode: _focoNome,
-              displayStringForOption: (s) => s.item.nome,
+              // Fica o nome que a pessoa escolheu: "Microvlar" continua
+              // "Microvlar" (não vira o princípio ativo, o que parecia
+              // cadastro errado). Quem digitou o princípio fica com ele.
+              displayStringForOption: (s) => s.nomeEscolhido,
               optionsBuilder: (v) => catalogo.buscar(v.text),
               onSelected: _aoEscolherDoCatalogo,
               fieldViewBuilder: (ctx, controller, foco, aoEnviar) => TextField(
@@ -650,11 +653,13 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
                   labelText: 'Nome do remédio',
                   hintText: 'Ex.: Losartana',
                   errorText: _tentouSalvar ? _erroNome : null,
+                  // Nome comercial: mostra o princípio ativo, para conferir.
+                  helperText: _principioAtivo(catalogo),
+                  helperMaxLines: 3,
                 ),
                 onChanged: (_) => setState(() {
                   if (_itemCatalogo != null &&
-                      normalizarBusca(_nome.text) !=
-                          normalizarBusca(_itemCatalogo!.nome)) {
+                      catalogo.porNome(_nome.text) != _itemCatalogo) {
                     _itemCatalogo = null;
                   }
                 }),
@@ -667,6 +672,16 @@ class _FormularioState extends ConsumerState<FormularioRemedioScreen> {
         ],
       ),
     ]);
+  }
+
+  /// "Princípio ativo: ..." quando o nome digitado é um nome comercial.
+  String? _principioAtivo(CatalogoMedicamentos catalogo) {
+    final ItemCatalogo? item = _itemCatalogo ?? catalogo.porNome(_nome.text);
+    if (item == null ||
+        normalizarBusca(item.nome) == normalizarBusca(_nome.text)) {
+      return null;
+    }
+    return 'Princípio ativo: ${item.nome}';
   }
 
   Widget _secaoDose() {
@@ -1083,7 +1098,7 @@ class _ListaDeSugestoes extends StatelessWidget {
                     color: escuro ? c.destaque : azulMarca,
                   ),
                   title: Text(
-                    s.item.nome,
+                    s.nomeEscolhido,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -1094,7 +1109,7 @@ class _ListaDeSugestoes extends StatelessWidget {
                       ? null
                       : Text(
                           [
-                            if (s.viaSinonimo != null) s.viaSinonimo!,
+                            if (s.viaSinonimo != null) s.item.nome,
                             if (s.item.dosagens.isNotEmpty)
                               s.item.dosagens.take(3).join(' · '),
                           ].join(' — '),

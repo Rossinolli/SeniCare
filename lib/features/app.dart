@@ -1,6 +1,7 @@
 // Raiz visual do app: tema, idioma, escala de texto e a primeira tela.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -34,9 +35,20 @@ class SeniCareApp extends ConsumerWidget {
         final MediaQueryData mq = MediaQuery.of(context);
         final double sistema = mq.textScaler.scale(100) / 100;
         final double total = (sistema * prefs.escalaTexto).clamp(0.85, 2.0);
-        return MediaQuery(
-          data: mq.copyWith(textScaler: TextScaler.linear(total)),
-          child: child!,
+        final c = coresDoTema(prefs.tema);
+        // Barra de botões do Android (◀ ● ■) na cor do tema em todas as
+        // telas — o cadastro e o relatório não têm barra inferior própria
+        // e ela ficava preta.
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: c.barraDeStatus.copyWith(
+            systemNavigationBarColor: c.barraNavegacao,
+            systemNavigationBarIconBrightness:
+                c.barraDeStatus.statusBarIconBrightness,
+          ),
+          child: MediaQuery(
+            data: mq.copyWith(textScaler: TextScaler.linear(total)),
+            child: child!,
+          ),
         );
       },
       home: const _RaizDoApp(),

@@ -15,12 +15,24 @@ void main() {
   final List<dynamic> brutos = json['itens'] as List<dynamic>;
   final CatalogoMedicamentos catalogo = CatalogoMedicamentos.fromJson(json);
 
-  test('tem mais de 500 medicamentos, todos com forma válida', () {
-    expect(catalogo.itens.length, greaterThanOrEqualTo(500));
+  test('catálogo com a base da ANVISA (≥ 3× os 521 curados)', () {
+    expect(catalogo.itens.length, greaterThanOrEqualTo(1563));
+    final int nomesComerciais = catalogo.itens.fold(
+      0,
+      (n, i) => n + i.sinonimos.length,
+    );
+    expect(nomesComerciais, greaterThan(4000));
+  });
+
+  test('formas válidas; curados sempre com forma', () {
     for (final bruto in brutos) {
       final List<dynamic> formas =
           (bruto as Map<String, dynamic>)['f'] as List<dynamic>;
-      expect(formas, isNotEmpty, reason: '${bruto['n']}');
+      // Itens só da ANVISA não têm forma (a base não informa): o app mostra
+      // todas. Os curados (com gramaturas) sempre têm.
+      if ((bruto['d'] as List).isNotEmpty) {
+        expect(formas, isNotEmpty, reason: '${bruto['n']}');
+      }
       for (final f in formas) {
         expect(
           FormaFarmaceutica.daChave(f as String),
@@ -55,6 +67,14 @@ void main() {
     expect(catalogo.porNome('Dipirona')!.formas, ['comprimido', 'gotas', 'ml']);
     expect(catalogo.porNome('Losartana')!.formas, ['comprimido']);
     expect(catalogo.porNome('Salbutamol')!.formas, ['jato']);
+    // Marcas da ANVISA entram como sinônimos do remédio curado.
+    expect(
+      catalogo.porNome('Microvlar')!.nome,
+      'Levonorgestrel + Etinilestradiol',
+    );
+    expect(catalogo.porNome('Glifage')!.nome, 'Metformina');
+    final s = catalogo.buscar('microvl').first;
+    expect(s.nomeEscolhido, 'Microvlar');
     // Nome comercial também identifica o remédio.
     expect(catalogo.porNome('yasmin')!.nome, 'Drospirenona + Etinilestradiol');
   });

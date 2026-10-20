@@ -72,6 +72,10 @@ class SugestaoCatalogo {
   final String? viaSinonimo;
 
   const SugestaoCatalogo(this.item, {this.viaSinonimo});
+
+  /// O nome que fica no cadastro: o nome comercial que casou com a busca
+  /// ("Microvlar") ou, se a pessoa digitou o princípio ativo, ele.
+  String get nomeEscolhido => viaSinonimo ?? item.nome;
 }
 
 String normalizarBusca(String texto) =>
@@ -137,9 +141,17 @@ class CatalogoMedicamentos {
         achados.add((3, SugestaoCatalogo(item)));
       }
     }
+    // Na mesma relevância, primeiro os remédios com gramaturas conhecidas
+    // (os de uso comum, curados) e os nomes mais curtos.
     achados.sort((a, b) {
-      final int c = a.$1.compareTo(b.$1);
-      return c != 0 ? c : a.$2.item.nome.compareTo(b.$2.item.nome);
+      int c = a.$1.compareTo(b.$1);
+      if (c != 0) return c;
+      c = (a.$2.item.dosagens.isEmpty ? 1 : 0).compareTo(
+        b.$2.item.dosagens.isEmpty ? 1 : 0,
+      );
+      if (c != 0) return c;
+      c = a.$2.nomeEscolhido.length.compareTo(b.$2.nomeEscolhido.length);
+      return c != 0 ? c : a.$2.nomeEscolhido.compareTo(b.$2.nomeEscolhido);
     });
     return [for (final a in achados.take(limite)) a.$2];
   }

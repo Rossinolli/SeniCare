@@ -11,6 +11,7 @@ import '../../core/preferencias.dart';
 import '../../core/tema.dart';
 import '../../domain/dose_schedule.dart';
 import '../../domain/medicamento.dart';
+import '../../services/indicar_app.dart';
 import '../../services/notification_service.dart';
 
 class AjustesScreen extends ConsumerWidget {
@@ -40,6 +41,7 @@ class AjustesScreen extends ConsumerWidget {
                     Text('Tema', style: context.textos.titleSmall),
                     const SizedBox(height: 12),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         for (final t in TemaApp.values) ...[
                           Expanded(
@@ -192,12 +194,11 @@ class AjustesScreen extends ConsumerWidget {
                     ListTile(
                       leading: const Icon(Icons.favorite_border_rounded),
                       title: const Text('Indicar o SeniCare'),
-                      onTap: () => SharePlus.instance.share(
-                        ShareParams(
-                          text:
-                              'Conheça o SeniCare: lembretes de remédio simples, com alarme na hora certa e histórico das doses.',
-                        ),
+                      subtitle: Text(
+                        'Envie o aplicativo para um amigo ou familiar',
+                        style: context.textos.bodySmall,
                       ),
+                      onTap: () => _indicar(context),
                     ),
                   ],
                 ),
@@ -222,9 +223,26 @@ class AjustesScreen extends ConsumerWidget {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => showLicensePage(
-                        context: context,
-                        applicationName: 'SeniCare',
+                      // Página de licenças no fundo do tema e sem passar
+                      // por baixo dos botões do Android.
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => FundoDoTema(
+                            child: SafeArea(
+                              top: false,
+                              child: LicensePage(
+                                applicationName: 'SeniCare',
+                                applicationIcon: const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SeloMarca(tamanho: 64),
+                                ),
+                                applicationLegalese:
+                                    '© 2026 $desenvolvedor. Todos os direitos '
+                                    'reservados.',
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       child: const Text('Licenças'),
                     ),
@@ -257,6 +275,47 @@ class AjustesScreen extends ConsumerWidget {
   }
 }
 
+/// Autor do aplicativo, exibido em Ajustes > Licenças.
+const String desenvolvedor = 'Hivan';
+
+/// Com link publicado, pergunta se envia o link ou o arquivo; sem link,
+/// envia direto o arquivo do aplicativo.
+Future<void> _indicar(BuildContext context) async {
+  String? escolha = 'arquivo';
+  if (IndicarApp.temLink) {
+    escolha = await mostrarFolha<String>(
+      context,
+      (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.link_rounded),
+              title: const Text('Enviar o link de download'),
+              onTap: () => Navigator.pop(ctx, 'link'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.android_rounded),
+              title: const Text('Enviar o aplicativo (arquivo)'),
+              subtitle: const Text('Funciona mesmo sem internet na loja'),
+              onTap: () => Navigator.pop(ctx, 'arquivo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  if (escolha == 'link') {
+    await IndicarApp.enviarLink();
+  } else if (escolha == 'arquivo') {
+    final bool ok = await IndicarApp.enviarArquivo();
+    if (!ok && context.mounted) {
+      avisar(context, 'Não foi possível preparar o arquivo.', erro: true);
+    }
+  }
+}
+
 class _OpcaoTema extends StatelessWidget {
   final TemaApp tema;
   final bool selecionado;
@@ -282,45 +341,62 @@ class _OpcaoTema extends StatelessWidget {
         onTap: onTap,
         child: Column(
           children: [
-            Container(
-              height: 64,
-              decoration: previa.decoracaoDeFundo.copyWith(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: selecionado ? c.destaque : c.borda,
-                  width: selecionado ? 3 : 1.2,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Container(
-                width: 40,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: previa.superficie,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: previa.borda),
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                if (selecionado) ...[
-                  Icon(Icons.check_circle_rounded, size: 18, color: c.destaque),
-                  const SizedBox(width: 4),
-                ],
-                Flexible(
-                  child: Text(
-                    tema.rotulo,
-                    style: context.textos.labelLarge?.copyWith(
-                      fontWeight: selecionado
-                          ? FontWeight.w800
-                          : FontWeight.w500,
+                Container(
+                  height: 64,
+                  decoration: previa.decoracaoDeFundo.copyWith(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selecionado ? c.destaque : c.borda,
+                      width: selecionado ? 3 : 1.2,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 40,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: previa.superficie,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: previa.borda),
                     ),
                   ),
                 ),
+                // O ✓ fica sobre o canto do bloco, não ao lado do nome: na
+                // fonte grande ele empurrava o rótulo para duas linhas e o
+                // bloco escolhido subia em relação aos outros.
+                if (selecionado)
+                  Positioned(
+                    top: -7,
+                    right: -7,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: c.tema == TemaApp.claro ? Colors.white : c.fundo,
+                      ),
+                      child: Icon(
+                        Icons.check_circle_rounded,
+                        size: 24,
+                        color: c.destaque,
+                      ),
+                    ),
+                  ),
               ],
+            ),
+            const SizedBox(height: 6),
+            // Uma linha só, encolhendo se a fonte for muito grande: os três
+            // rótulos ficam sempre na mesma altura.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                tema.rotulo,
+                maxLines: 1,
+                style: context.textos.labelLarge?.copyWith(
+                  fontWeight: selecionado ? FontWeight.w800 : FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
