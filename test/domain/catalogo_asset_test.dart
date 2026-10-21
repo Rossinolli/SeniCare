@@ -15,13 +15,15 @@ void main() {
   final List<dynamic> brutos = json['itens'] as List<dynamic>;
   final CatalogoMedicamentos catalogo = CatalogoMedicamentos.fromJson(json);
 
-  test('catálogo com a base da ANVISA (≥ 3× os 521 curados)', () {
-    expect(catalogo.itens.length, greaterThanOrEqualTo(1563));
+  test('catálogo com toda a base ativa da ANVISA', () {
+    expect(catalogo.itens.length, greaterThanOrEqualTo(3500));
     final int nomesComerciais = catalogo.itens.fold(
       0,
       (n, i) => n + i.sinonimos.length,
     );
-    expect(nomesComerciais, greaterThan(4000));
+    expect(nomesComerciais, greaterThan(5000));
+    // Produtos sem princípio ativo informado (baixo risco) também entram.
+    expect(catalogo.buscar('vaselina'), isNotEmpty);
   });
 
   test('formas válidas; curados sempre com forma', () {
@@ -101,6 +103,6 @@ void main() {
     for (final q in ['di', 'par', 'amox', 'vitamina', 'metf', 'xa']) {
       catalogo.buscar(q);
     }
-    expect(relogio.elapsedMilliseconds, lessThan(200));
+    expect(relogio.elapsedMilliseconds, lessThan(100));
   });
 }

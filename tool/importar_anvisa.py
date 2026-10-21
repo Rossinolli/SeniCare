@@ -7,13 +7,15 @@ separado por ';', codificação Latin-1).
 Uso:
     python tool/importar_anvisa.py caminho/DADOS_ABERTOS_MEDICAMENTOS.csv
 
-Gera tool/dados/anvisa_resumo.json: um item por princípio ativo (só
-registros ATIVOS, de uso humano comum), com os nomes comerciais e a classe
-terapêutica. O arquivo resumido fica no repositório, então
+Gera tool/dados/anvisa_resumo.json com TODOS os medicamentos de registro
+ATIVO (os inativos não são mais vendidos): um item por princípio ativo, com
+os nomes comerciais e a classe terapêutica; produtos sem princípio ativo
+informado (baixo risco, fitoterápicos, soros) entram pelo nome do produto. O arquivo resumido fica no repositório, então
 tool/gerar_catalogo.py roda sem a planilha de 46 MB.
 """
 
 import collections
+import html
 import csv
 import io
 import json
@@ -24,19 +26,6 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 DESTINO = RAIZ / "tool" / "dados" / "anvisa_resumo.json"
-
-CATEGORIAS = {
-    "Genérico", "Similar", "Novo", "Específico", "Biológico", "Fitoterápico",
-    "FITOTER?PICO",
-}
-
-# Classes de uso hospitalar ou diagnóstico: não fazem sentido num lembrete
-# de remédio tomado em casa.
-CLASSES_FORA = re.compile(
-    r"VACINA|SORO|ANESTESICOS GERAIS|RADIO|CONTRASTE|DIAGNOSTICO|"
-    r"SOLUCOES|SUBSTITUTOS DO PLASMA|PARENTERA|DIALISE|HEMODIAL|"
-    r"CARDIOPLEG|BLOQUEADORES NEUROMUSCULARES|IMUNOGLOBULINA"
-)
 
 # Sais, hidratos e radicais que não mudam o "nome do remédio" para quem usa
 # (losartana potássica = losartana).
@@ -119,6 +108,12 @@ def nome_comercial(bruto: str) -> str:
     return " ".join(palavras)
 
 
+def nome_valido(bruto: str) -> bool:
+    """Descarta nomes ilegíveis da base ("N?O DECLARADO", "&#231;")."""
+    t = sem_acento(bruto).upper()
+    return bool(t.strip()) and "?" not in bruto and "NAO DECLARADO" not in t
+
+
 def main() -> None:
     caminho = sys.argv[1]
     grupos = collections.defaultdict(lambda: {
@@ -129,25 +124,35 @@ def main() -> None:
         for l in csv.DictReader(f, delimiter=";"):
             if l["SITUACAO_REGISTRO"] != "Ativo":
                 continue
-            if l["CATEGORIA_REGULATORIA"] not in CATEGORIAS:
-                continue
-            principio = l["PRINCIPIO_ATIVO"].strip()
+            bruto = html.unescape(l["NOME_PRODUTO"])
+            principio = html.unescape(l["PRINCIPIO_ATIVO"]).strip()
             classe = l["CLASSE_TERAPEUTICA"].strip()
-            if not principio or CLASSES_FORA.search(sem_acento(classe)):
-                continue
-            comps = componentes(principio)
+            comps = componentes(principio) if principio else []
             if not comps or len(comps) > 4:
+                # Sem princípio ativo informado, ou associação longa demais
+                # para virar nome ("A + B + C + D + E"): entra pelo nome do
+                # produto.
+                if not nome_valido(bruto):
+                    continue
+                nome = nome_comercial(bruto)
+                if not nome:
+                    continue
+                g = grupos[sem_acento(nome).lower()]
+                g["principio"][nome] += 1
+                g["registros"] += 1
+                if classe:
+                    g["classes"][classe] += 1
                 continue
             g = grupos[chave(principio)]
             g["principio"][nome_generico(principio)] += 1
             g["registros"] += 1
             if classe:
                 g["classes"][classe] += 1
-            marca = nome_comercial(l["NOME_PRODUTO"])
+            marca = nome_comercial(bruto)
             # Genérico registrado pelo nome do princípio não é marca, nem
             # "Laboratório X - Dipirona".
             nm = sem_acento(marca).lower()
-            if (marca and not NAO_MARCA.search(marca)
+            if (marca and nome_valido(bruto) and not NAO_MARCA.search(marca)
                     and not any(len(c) >= 5 and sem_acento(c) in nm
                                 for c in comps)):
                 g["marcas"].add(marca)
@@ -166,7 +171,7 @@ def main() -> None:
         })
     DESTINO.parent.mkdir(parents=True, exist_ok=True)
     texto = json.dumps({"fonte": "ANVISA - dados abertos, medicamentos "
-                        "registrados (situação Ativo)", "itens": itens},
+                        "registrados (todos com situação Ativo)", "itens": itens},
                        ensure_ascii=False)
     texto = texto.replace('"itens": [{', '"itens": [\n{').replace("}, {", "},\n{")
     io.open(DESTINO, "w", encoding="utf-8").write(texto + "\n")

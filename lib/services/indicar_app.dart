@@ -12,9 +12,18 @@ import 'package:share_plus/share_plus.dart';
 /// app não estiver publicado: aí só o envio do arquivo é oferecido.
 const String linkDeDownload = '';
 
+/// Descrição enviada junto com o aplicativo.
 const String _convite =
-    'Conheça o SeniCare: lembretes de remédio simples, com alarme na hora '
-    'certa e histórico das doses.';
+    'Este é o SeniCare, um aplicativo que ajuda a tomar os remédios na hora '
+    'certa: ele avisa com alarme no horário de cada dose, guarda o '
+    'histórico do que foi tomado e gera um relatório para levar ao médico. '
+    'Feito para ser simples, com letras grandes e poucos toques. Gratuito e '
+    'sem anúncios; os dados ficam só no celular.';
+
+const String _comoInstalar =
+    'Como instalar: abra o arquivo SeniCare.apk no celular Android e toque '
+    'em Instalar (se o celular pedir, permita "instalar apps '
+    'desconhecidos").';
 
 class IndicarApp {
   static const MethodChannel _nativo = MethodChannel('senicare/overlay_alarm');
@@ -44,10 +53,10 @@ class IndicarApp {
               mimeType: 'application/vnd.android.package-archive',
             ),
           ],
-          text:
-              '$_convite\nPara instalar, abra o arquivo SeniCare.apk no '
-              'celular Android (permita "instalar apps desconhecidos" se '
-              'ele pedir).',
+          // O WhatsApp, o e-mail e o Drive mostram a descrição junto com o
+          // arquivo; o assunto vale para o e-mail.
+          subject: 'SeniCare — aplicativo de lembrete de remédios',
+          text: '$_convite\n\n$_comoInstalar',
         ),
       );
       return true;

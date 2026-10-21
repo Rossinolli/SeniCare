@@ -33,6 +33,10 @@ class ItemCatalogo {
   final String _nomeNormalizado;
   final List<String> _sinonimosNormalizados;
 
+  /// Palavras do nome ("orfenadrina", "dipirona", "cafeina"), preparadas
+  /// uma vez — a busca roda a cada letra digitada, em milhares de itens.
+  final List<String> _palavras;
+
   ItemCatalogo({
     required this.nome,
     this.sinonimos = const [],
@@ -40,7 +44,8 @@ class ItemCatalogo {
     this.dosagens = const [],
     this.motivos = const [],
   }) : _nomeNormalizado = normalizarBusca(nome),
-       _sinonimosNormalizados = sinonimos.map(normalizarBusca).toList();
+       _sinonimosNormalizados = sinonimos.map(normalizarBusca).toList(),
+       _palavras = normalizarBusca(nome).split(_separadorDePalavras);
 
   factory ItemCatalogo.fromJson(Map<String, dynamic> json) => ItemCatalogo(
     nome: json['n'] as String,
@@ -63,6 +68,8 @@ List<String> _lista(Object? valor) => switch (valor) {
   final String v => [v],
   _ => const [],
 };
+
+final RegExp _separadorDePalavras = RegExp(r'[\s+]+');
 
 /// Uma sugestão exibida no autocompletar.
 class SugestaoCatalogo {
@@ -133,7 +140,7 @@ class CatalogoMedicamentos {
         ));
         continue;
       }
-      if (nome.split(RegExp(r'[\s+]+')).any((p) => p.startsWith(q))) {
+      if (item._palavras.any((p) => p.startsWith(q))) {
         achados.add((2, SugestaoCatalogo(item)));
         continue;
       }

@@ -133,13 +133,27 @@ enum MotivoDeUso {
 /// 'Dipirona Sódica' → 'dipirona sodica'. Usado na busca do catálogo, para
 /// "dipir", "DIPIR" e "dípir" acharem o mesmo remédio.
 String removerAcentos(String texto) {
+  // Caminho rápido: texto sem acento (a maioria) volta como está, sem cópia.
+  // Roda milhares de vezes ao preparar o catálogo e a cada letra digitada.
+  final List<int> unidades = texto.codeUnits;
+  int i = 0;
+  while (i < unidades.length && unidades[i] < 0xC0) {
+    i++;
+  }
+  if (i == unidades.length) return texto;
+  final List<int> saida = List<int>.of(unidades);
+  for (; i < saida.length; i++) {
+    final int? troca = _semAcento[saida[i]];
+    if (troca != null) saida[i] = troca;
+  }
+  return String.fromCharCodes(saida);
+}
+
+/// Letra acentuada (código UTF-16) → letra sem acento.
+final Map<int, int> _semAcento = () {
   const String com = 'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ';
   const String sem = 'aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN';
-  final StringBuffer saida = StringBuffer();
-  for (final int unidade in texto.runes) {
-    final String c = String.fromCharCode(unidade);
-    final int i = com.indexOf(c);
-    saida.write(i >= 0 ? sem[i] : c);
-  }
-  return saida.toString();
-}
+  return {
+    for (int k = 0; k < com.length; k++) com.codeUnitAt(k): sem.codeUnitAt(k),
+  };
+}();

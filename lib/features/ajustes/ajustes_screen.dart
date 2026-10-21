@@ -276,7 +276,7 @@ class AjustesScreen extends ConsumerWidget {
 }
 
 /// Autor do aplicativo, exibido em Ajustes > Licenças.
-const String desenvolvedor = 'Hivan';
+const String desenvolvedor = 'Hivan Rossinolli';
 
 /// Com link publicado, pergunta se envia o link ou o arquivo; sem link,
 /// envia direto o arquivo do aplicativo.

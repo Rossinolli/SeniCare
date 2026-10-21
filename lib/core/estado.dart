@@ -6,8 +6,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,11 +107,40 @@ final totalTomadasPorMedicamentoProvider = StreamProvider<Map<int, int>>(
   (ref) => ref.watch(repositorioProvider).observarTotalTomadasPorMedicamento(),
 );
 
-/// Relógio do app (a cada 30 s): mantém "atrasada", "agora" e a virada do
-/// dia corretos com a tela aberta.
-final relogioProvider = StreamProvider<DateTime>((ref) async* {
-  yield DateTime.now();
-  yield* Stream.periodic(const Duration(seconds: 30), (_) => DateTime.now());
+/// Relógio do app: mantém "atrasada", "agora" e a virada do dia corretos
+/// com a tela aberta. Bate na virada de cada minuto (os horários do app são
+/// em minutos — antes, a cada 30 s, metade das reconstruções da tela era à
+/// toa) e para quando o app vai para segundo plano, sem gastar bateria;
+/// ao voltar, atualiza na hora.
+final relogioProvider = StreamProvider<DateTime>((ref) {
+  final StreamController<DateTime> saida = StreamController<DateTime>();
+  Timer? proximo;
+
+  void agendar() {
+    proximo?.cancel();
+    final DateTime agora = DateTime.now();
+    saida.add(agora);
+    final DateTime viradaDoMinuto = DateTime(
+      agora.year,
+      agora.month,
+      agora.day,
+      agora.hour,
+      agora.minute + 1,
+    );
+    proximo = Timer(viradaDoMinuto.difference(agora), agendar);
+  }
+
+  final AppLifecycleListener ciclo = AppLifecycleListener(
+    onResume: agendar,
+    onHide: () => proximo?.cancel(),
+  );
+  agendar();
+  ref.onDispose(() {
+    proximo?.cancel();
+    ciclo.dispose();
+    saida.close();
+  });
+  return saida.stream;
 });
 
 /// Agenda de hoje (doses com status), combinando remédios, respostas do dia
@@ -144,14 +175,20 @@ final saudeDoAlarmeProvider = FutureProvider<AlarmHealth>(
   (ref) => NotificationService().verificarSaudeDoAlarme(),
 );
 
-/// Catálogo offline de medicamentos (autocompletar do cadastro).
+/// Catálogo offline de medicamentos (autocompletar do cadastro), com a base
+/// inteira da ANVISA. A leitura do JSON e a preparação da busca (milhares de
+/// nomes sem acento) rodam em outro isolate: a tela não trava nem em
+/// aparelhos antigos. O MainShell já pede o catálogo logo após abrir, para
+/// ele estar pronto quando o cadastro for aberto.
 final catalogoProvider = FutureProvider<CatalogoMedicamentos>((ref) async {
   try {
     final String json = await rootBundle.loadString(
       'assets/data/medicamentos_br.json',
     );
-    return CatalogoMedicamentos.fromJson(
-      jsonDecode(json) as Map<String, dynamic>,
+    return await Isolate.run(
+      () => CatalogoMedicamentos.fromJson(
+        jsonDecode(json) as Map<String, dynamic>,
+      ),
     );
   } catch (_) {
     return CatalogoMedicamentos.vazio;

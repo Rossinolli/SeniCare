@@ -27,17 +27,21 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Intl.defaultLocale = 'pt_BR';
-  await initializeDateFormatting('pt_BR');
-
   final NotificationService notificacoes = NotificationService();
-  await notificacoes.init();
+
+  // As três preparações são independentes: em paralelo, a abertura fica
+  // mais rápida (sobretudo em aparelhos antigos, com armazenamento lento).
+  final (_, _, SharedPreferences prefs) = await (
+    initializeDateFormatting('pt_BR'),
+    notificacoes.init(),
+    SharedPreferences.getInstance(),
+  ).wait;
+
   // Se o app foi aberto POR um alarme, a tela de alarme abre logo após o
   // primeiro frame (ver MainShell).
   final AlarmLaunchInfo? alarmeInicial = await notificacoes
       .alarmeQueAbriuOApp();
   if (alarmeInicial != null) notificacoes.alarmePendente.value = alarmeInicial;
-
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
 
   // Licença da fonte embutida (Ajustes > Sobre > Licenças).
   LicenseRegistry.addLicense(() async* {

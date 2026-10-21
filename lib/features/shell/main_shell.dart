@@ -62,6 +62,9 @@ class _MainShellState extends ConsumerState<MainShell>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       _sincronizar();
+      // Prepara o catálogo de medicamentos em segundo plano: quando o
+      // cadastro abrir, o autocompletar já está pronto.
+      unawaited(ref.read(catalogoProvider.future));
       if (_notificacoes.alarmePendente.value != null) {
         _abrirAlarmePendente();
         return;

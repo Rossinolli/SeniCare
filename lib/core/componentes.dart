@@ -302,7 +302,11 @@ class SeloMarca extends StatelessWidget {
         'assets/branding/selo.png',
         width: tamanho,
         height: tamanho,
-        filterQuality: FilterQuality.high,
+        // Decodifica no tamanho exibido: a imagem é 1024×1024 (~4 MB de
+        // memória); a 56 dp, cai para ~150 KB — importante em celulares com
+        // pouca RAM.
+        cacheWidth: (tamanho * MediaQuery.devicePixelRatioOf(context)).ceil(),
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

@@ -14,7 +14,7 @@ ficam só no aparelho.
 | Área | O que faz |
 |---|---|
 | **Início** | Agenda do dia dose a dose, com status em texto e ícone (tomada, não tomada, atrasada, hora de tomar, a tomar), progresso do dia e próxima dose. Tocar numa dose permite registrar, corrigir ou desfazer a resposta. |
-| **Cadastro** | Nome com **sugestões de um catálogo offline** (~1.960 princípios ativos e ~7.500 nomes buscáveis: 521 curados + a base oficial da **ANVISA**; busca sem acento e por nome comercial — escolher "Microvlar" mantém "Microvlar" no cadastro e mostra o princípio ativo para conferência); **gramatura, quantidade, forma farmacêutica e motivo escolhidos em listas** (padronização para o alarme); horários fixos em dias da semana ou de X em X horas; duração; foto da caixa; estoque. |
+| **Cadastro** | Nome com **sugestões de um catálogo offline** (toda a base ativa da **ANVISA** + 521 remédios curados: ~3.560 medicamentos e ~9.400 nomes buscáveis; busca sem acento e por nome comercial — escolher "Microvlar" mantém "Microvlar" no cadastro e mostra o princípio ativo para conferência); **gramatura, quantidade, forma farmacêutica e motivo escolhidos em listas** (padronização para o alarme); horários fixos em dias da semana ou de X em X horas; duração; foto da caixa; estoque. |
 | **Alarme** | Tela cheia com o remédio padronizado ("Losartana · 50 mg · 1 comprimido · Para: Pressão alta") e as respostas Tomei / Adiar 10 min / Não vou tomar. Botões **Tomei** e **Adiar** também na própria notificação. Lembrete 30 min antes (opcional). |
 | **Histórico** | Calendário com marcação por dia, doses de cada dia (inclusive de remédios removidos) e **remédios já utilizados** — remover um remédio não apaga o passado. |
 | **Relatório** | Adesão dos últimos 7 dias, dia a dia, compartilhável em texto (WhatsApp, e-mail...). |
@@ -76,6 +76,6 @@ python tool/importar_anvisa.py DADOS_ABERTOS_MEDICAMENTOS.csv
 python tool/gerar_catalogo.py
 ```
 
-* Fonte oficial: [dados abertos da ANVISA — medicamentos registrados](https://dados.anvisa.gov.br/dados/DADOS_ABERTOS_MEDICAMENTOS.csv) (só registros **ativos**, sem vacinas, soros e uso hospitalar). O resumo fica em `tool/dados/anvisa_resumo.json`.
+* Fonte oficial: [dados abertos da ANVISA — medicamentos registrados](https://dados.anvisa.gov.br/dados/DADOS_ABERTOS_MEDICAMENTOS.csv) (todos os registros **ativos**; os inativos não são mais vendidos). O resumo fica em `tool/dados/anvisa_resumo.json`.
 * Curadoria (`tool/catalogo_*.py`): formas, gramaturas e usos dos remédios mais comuns; a classe terapêutica da ANVISA sugere o "Para que serve?" dos demais (`tool/classes_anvisa.py`).
 
